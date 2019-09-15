@@ -29,6 +29,35 @@ int main(int argc, char *argv[]) {
       expect_next_type(WHY_JSON_END);
       obs_test_eq(int, errno, 0);
     })
+
+    OBS_TEST("Bool", {
+      setup_str("{ \"first_one\": true, \"second_one\": false }");
+      expect_next_obj_value(WHY_JSON_BOOL | WHY_JSON_OBJECT_FLAG, "first_one",
+                            int, 1);
+      expect_next_obj_value(WHY_JSON_BOOL | WHY_JSON_OBJECT_FLAG, "second_one",
+                            int, 0);
+      expect_next_type(WHY_JSON_END);
+      obs_test_eq(int, errno, 0);
+    })
+
+    OBS_TEST("Null", {
+      setup_str("{ \"this\": null }");
+      expect_next_key_only(WHY_JSON_NULL | WHY_JSON_OBJECT_FLAG, "this");
+      expect_next_type(WHY_JSON_END);
+      obs_test_eq(int, errno, 0);
+    })
+
+    OBS_TEST("Float", {
+      setup_str("{ \"a\": 2.2, \"b\": 0.0, \"c\": 4.3e+9, \"d\": 2e-10, \"e\": "
+                "-4.4e22 }");
+      expect_next_obj_value(WHY_JSON_FLT | WHY_JSON_OBJECT_FLAG, "a", double, 2.2);
+      expect_next_obj_value(WHY_JSON_FLT | WHY_JSON_OBJECT_FLAG, "b", double, 0.0);
+      expect_next_obj_value(WHY_JSON_FLT | WHY_JSON_OBJECT_FLAG, "c", double, 4.3e+9);
+      expect_next_obj_value(WHY_JSON_FLT | WHY_JSON_OBJECT_FLAG, "d", double, 2e-10);
+      expect_next_obj_value(WHY_JSON_FLT | WHY_JSON_OBJECT_FLAG, "e", double, -4.4e22);
+      expect_next_type(WHY_JSON_END);
+      obs_test_eq(int, errno, 0);
+    })
   })
 
 #ifndef WHY_JSON_STRICT
