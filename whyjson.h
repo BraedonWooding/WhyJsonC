@@ -47,7 +47,7 @@ SOFTWARE.
 #include <string.h>
 
 #define WHY_JSON_MAJOR_V "1"
-#define WHY_JSON_MINOR_V "1"
+#define WHY_JSON_MINOR_V "0"
 #define WHY_JSON_PATCH_V "a"
 
 #define WHY_JSON_VERSION WHY_JSON_MAJOR_V "." WHY_JSON_MINOR_V "." WHY_JSON_PATCH_V
