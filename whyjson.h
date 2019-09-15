@@ -46,6 +46,12 @@ SOFTWARE.
 #include <stdlib.h>
 #include <string.h>
 
+#define WHY_JSON_MAJOR_V "1"
+#define WHY_JSON_MINOR_V "1"
+#define WHY_JSON_PATCH_V "a"
+
+#define WHY_JSON_VERSION WHY_JSON_MAJOR_V "." WHY_JSON_MINOR_V "." WHY_JSON_PATCH_V
+
 #if defined _MSC_VER || defined __MINGW32__ || defined _WIN32
 #define WHY_JSON_WINDOWS
 #endif
@@ -208,7 +214,8 @@ _WHY_JSON_FUNC_ uint32_t why_json_is_legal_utf8(uint32_t *state,
     return 0;
   }
 
-  for (size_t i = 0; i < length; i++) {
+  size_t i;
+  for (i = 0; i < length; i++) {
     type = utf8d[(uint8_t)bytes[i]];
     *state = utf8d[256 + (*state) * 16 + type];
 

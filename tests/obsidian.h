@@ -37,8 +37,10 @@
         - Inside each OBS_TEST's contents you can put multiple obs_test's
           i.e. obs_test_eq(int, a, b);
         There are the following tests:
-        - obs_test(cond, fmt, args...)
+        - obs_test(cond, args...)
           i.e. obs_test(a > 0, "a (%d) is positive", a);
+          You should always provide atleast a string for the printf and how
+          ever many args you want after that.
         - obs_test_binop(type, x, op, y)
           i.e. obs_test_binop(int, x, ==, !=, y);
           > Prints out both arguments evaluated values in a nice way
@@ -54,6 +56,13 @@
             equivalent.
             NOTE: You can override the strcmp function by defining OBS_STRCMP
         - obs_test_str_neq(x, y) opposite of above.
+        - obs_test_mem_eq(type, x, y)
+            Does a byte comparison, note x and y should be `(type *)`
+            i.e. pass them as pointers, this prevents us having to do any voodoo
+            and acts like how you would want a memcmp to work.
+            NOTE: You can override the memcmp function by defining OBS_MEMCMP
+        - obs_test_mem_neq(type, x, y)
+            opposite of above
         - obs_test_null(x) => obs_test_eq(void*, x, NULL) with nicer output
         - obs_test_not_null(x) => obs_test_neq(void*, x, NULL) with nicer output
         - obs_test_true(x) => obs_test_eq(bool, x, true) with nicer output
@@ -118,8 +127,8 @@
 #include <string.h>
 
 #define OBS_MAJOR_V "1"
-#define OBS_MINOR_V "0"
-#define OBS_PATCH_V "c"
+#define OBS_MINOR_V "1"
+#define OBS_PATCH_V "a"
 
 #define OBS_VERSION OBS_MAJOR_V "." OBS_MINOR_V "." OBS_PATCH_V
 
@@ -336,7 +345,8 @@
     benchmarks_run++;                                                          \
     double avg_sys = 0, avg_usr = 0, avg_total = 0;                            \
     int failed = 0;                                                            \
-    for (int i = 0; i < repetitions; ++i) {                                    \
+    int i;                                                                     \
+    for (i = 0; i < repetitions; ++i) {                                        \
       double startReal = wall_time();                                          \
       cbenchTime start = get_time();                                           \
       __VA_ARGS__;                                                             \
@@ -456,17 +466,18 @@
 
 #define obs_err(...)                                                           \
   do {                                                                         \
-    if (raise_on_err) {                                                        \
-      raise(OBS_ERROR_SIGNAL);                                                 \
+    if (success) {                                                             \
+      if (raise_on_err) {                                                      \
+        raise(OBS_ERROR_SIGNAL);                                               \
+      }                                                                        \
+      success = false;                                                         \
+      fprintf(err_log,                                                         \
+              GRN __FILE__ ":%d" RESET RED " TEST FAILED: " RESET "%s:%s"      \
+                           "\n",                                               \
+              __LINE__, cur_group, cur_test);                                  \
+      fprintf(err_log, __VA_ARGS__);                                           \
+      fprintf(err_log, "\n\n");                                                \
     }                                                                          \
-    success = false;                                                           \
-    fprintf(err_log,                                                           \
-            GRN __FILE__ ":%d" RESET RED " TEST FAILED: " RESET "%s:%s"        \
-                         "\n",                                                 \
-            __LINE__, cur_group, cur_test);                                    \
-    fprintf(err_log, "Error triggered\n");                                     \
-    fprintf(err_log, __VA_ARGS__);                                             \
-    fprintf(err_log, "\n\n");                                                  \
   } while (0)
 
 #define obs_test_binop(type, x, op, y)                                         \
@@ -616,10 +627,12 @@ _OBSIDIAN_FUNC_ const char *obs_get_format_(char *type) {
 
 // Can we run the test/benchmark based on settings
 _OBSIDIAN_FUNC_ bool obs_can_run_(char *name, char **start, int len) {
-  if (start == NULL)
+  if (start == NULL) {
     return true;
+  }
 
-  for (int i = 0; i < len; i++) {
+  int i;
+  for (i = 0; i < len; i++) {
     if (!strcmp(name, start[i])) {
       return true;
     }
@@ -658,7 +671,8 @@ _OBSIDIAN_FUNC_ bool obs_parse_args_(FILE *out, int *argc, char ***argv,
   bool custom_settings = false;
   bool version = false;
 
-  for (int i = 1; i < *argc; i++) {
+  int i;
+  for (i = 1; i < *argc; i++) {
     if (!strcmp((*argv)[i], "--tests") || !strcmp((*argv)[i], "-t")) {
       if (*test_start != NULL) {
         fprintf(stderr, "Parse Error: you can't have multiple"
@@ -744,7 +758,8 @@ _OBSIDIAN_FUNC_ bool obs_parse_args_(FILE *out, int *argc, char ***argv,
   if (*start != NULL) {                                                        \
     if (*count > 0) {                                                          \
       fprintf(out, "- Running " name ": %s", (*start)[0]);                     \
-      for (int i = 1; i < *count; i++) {                                       \
+      int i;                                                                   \
+      for (i = 1; i < *count; i++) {                                           \
         fprintf(out, " %s", (*start)[i]);                                      \
       }                                                                        \
       fprintf(out, "\n");                                                      \
