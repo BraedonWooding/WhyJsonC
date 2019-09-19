@@ -2,25 +2,26 @@
 
 int main(void) {
   char *json =
-      "{ \"a\": 2, \"b\": \"Coolies 🎫\", \"c\": [1, 2, []], \"k\": 5.4 }";
+      "{ \"a\": 2, \"b\": \"Coolies 🎫\", \"c\": [1, 2, []], \"k\": 5.4, \"c\": "
+      "\"\\u0068\\u0065\\u006c\\u006c\\u006F\", \"d\": \"\\U00010437\" }";
   WhyJsonIt it;
   why_json_str(&it, json);
   WhyJsonTok tok;
-
+  int first = 1;
   errno = 0;
-  printf("{");
-  while (why_json_next(&tok, &it) &&
-         !WHY_JSON_TYPE_IS(tok.type, WHY_JSON_END)) {
-    if (!tok.first)
-      printf(",\n");
-    else
-      printf("\n");
+  while (why_json_next(&tok, &it) && tok.type != WHY_JSON_END) {
+    if (!first) {
+      printf((!tok.first) ? ",\n" : "\n");
+    } else {
+      first = 0;
+    }
     for (int i = 0; i < it.depth; i++) {
       printf("  ");
     }
-    if (tok.key.buf != NULL)
+    if (tok.key.buf != NULL) {
       printf("\"%s\": ", tok.key.buf);
-    switch (WHY_JSON_TYPE_STRIP(tok.type)) {
+    }
+    switch (tok.type) {
     case WHY_JSON_ARRAY: {
       printf("[");
     } break;
@@ -54,10 +55,13 @@ int main(void) {
     case WHY_JSON_ERROR: {
       printf("Error!!! %s", it.err);
     } break;
-    default: { printf("WAT %d\n", tok.type); } break;
+    default: { printf("Unknown: %d\n", tok.type); } break;
     }
   }
-  printf("\n}\n");
+  printf("\n");
+  if (errno != 0) {
+    printf("%d: %s, %c\n", errno, it.err, it.invalid_char);
+  }
 
   return 0;
 }
