@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
       expect_next_obj_string("b a h da", "bob");
       expect_next_key_only(JSON_ARRAY, "k");
       expect_next_type(JSON_ARRAY_END);
-      expect_next_obj_string("", "epty");
+      expect_next_obj_string("", "empty");
       expect_next_type(JSON_OBJECT_END);
       expect_next_type(JSON_END);
       obs_test_eq(int, errno, 0);
