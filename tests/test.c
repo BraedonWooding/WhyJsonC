@@ -23,9 +23,9 @@ int main(int argc, char *argv[]) {
       setup_str("{ \"a\": \"swifty\", \"b\": \"nice\", \"unicode_character\": "
                 "\"🐻\" }");
       expect_next_type(JSON_OBJECT);
-      expect_next_obj_value(JSON_STRING, "a", char, "swifty");
-      expect_next_obj_value(JSON_STRING, "b", char, "nice");
-      expect_next_obj_value(JSON_STRING, "unicode_character", char, "🐻");
+      expect_next_obj_string("a", "swifty");
+      expect_next_obj_string("b", "nice");
+      expect_next_obj_string("unicode_character", "🐻");
       expect_next_type(JSON_OBJECT_END);
       expect_next_type(JSON_END);
       obs_test_eq(int, errno, 0);
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
       expect_next_array_value(JSON_INT, long, 1);
       expect_next_array_value(JSON_FLT, double, 2.5);
       expect_next_type(JSON_ARRAY);
-      expect_next_array_value(JSON_STRING, char, "hey");
+      expect_next_array_string("hey");
       expect_next_array_value(JSON_INT, long, 9);
       expect_next_type(JSON_ARRAY_END);
       expect_next_type(JSON_ARRAY_END);
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
       setup_str("[ 1, \"hey\", null, { \"one\": [] }, [] ]");
       expect_next_type(JSON_ARRAY);
       expect_next_array_value(JSON_INT, long, 1);
-      expect_next_array_value(JSON_STRING, char, "hey");
+      expect_next_array_string("hey");
       expect_next_type(JSON_NULL);
       expect_next_type(JSON_OBJECT);
       expect_next_key_only(JSON_ARRAY, "one");
@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
     ;
     OBS_TEST("Ascii Unicode", {
       setup_str("\"\\u0068\\u0065\\u006c\\u006c\\u006F\"");
-      expect_next_array_value(JSON_STRING, char, "hello");
+      expect_next_array_string("hello");
     })
 
     OBS_TEST("Surrogate pair invalid", {
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
 
     OBS_TEST("Full Codepoint", {
       setup_str("\"\\U00010348\"");
-      expect_next_array_value(JSON_STRING, char, "\U00010348");
+      expect_next_array_string("\U00010348");
     })
 
     OBS_TEST("Surrogate halves wrong order", {
@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
 
     OBS_TEST("Valid Pair", {
       setup_str("\"\\uD800\\uDC00\"");
-      expect_next_array_value(JSON_STRING, char, "\xf0\x90\x80\x80");
+      expect_next_array_string("\xf0\x90\x80\x80");
     })
   })
 
@@ -195,17 +195,17 @@ int main(int argc, char *argv[]) {
     });
 
     OBS_TEST("Keys not quoted", {
-        setup_str("{ a: 5, b a h da : \"bob\", k: [], : \"empty\" }");
-        expect_next_type(JSON_OBJECT);
-        expect_next_obj_value(JSON_INT, "a", long, 5);
-        expect_next_obj_value(JSON_STRING, "b a h da", char, "bob");
-        expect_next_key_only(JSON_ARRAY, "k");
-        expect_next_type(JSON_ARRAY_END);
-        expect_next_obj_value(JSON_STRING, "", char, "epty");
-        expect_next_type(JSON_OBJECT_END);
-        expect_next_type(JSON_END);
-        obs_test_eq(int, errno, 0);
-      })
+      setup_str("{ a: 5, b a h da : \"bob\", k: [], : \"empty\" }");
+      expect_next_type(JSON_OBJECT);
+      expect_next_obj_value(JSON_INT, "a", long, 5);
+      expect_next_obj_string("b a h da", "bob");
+      expect_next_key_only(JSON_ARRAY, "k");
+      expect_next_type(JSON_ARRAY_END);
+      expect_next_obj_string("", "epty");
+      expect_next_type(JSON_OBJECT_END);
+      expect_next_type(JSON_END);
+      obs_test_eq(int, errno, 0);
+    })
   })
 #else
   OBS_TEST_GROUP("Strict", {
