@@ -1,6 +1,6 @@
 # Why Json?
 
-![](https://github.com/BraedonWooding/WhyJsonC/workflows/.github/workflows/main.yml/badge.svg)
+![](https://github.com/BraedonWooding/WhyJsonC/workflows/CI/badge.svg)
 
 > By Braedon Wooding
 
