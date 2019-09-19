@@ -7,7 +7,7 @@
 
 #define expect_next_obj_value(expect_type, expect_key, val_type, expect_value) \
   do {                                                                         \
-    obs_test_true(why_json_next(&tok, &it));                                   \
+    obs_test_true(json_next(&tok, &it));                                       \
     obs_test_eq(uint8_t, (expect_type), tok.type);                             \
     if (tok.type != WHY_JSON_STRING && tok.type != WHY_JSON_FLT &&             \
         tok.type != WHY_JSON_INT && tok.type != WHY_JSON_BOOL) {               \
@@ -26,7 +26,7 @@
 
 #define expect_next_key_only(expect_type, expect_key)                          \
   do {                                                                         \
-    obs_test_true(why_json_next(&tok, &it));                                   \
+    obs_test_true(json_next(&tok, &it));                                       \
     obs_test_eq(uint8_t, expect_type, tok.type);                               \
     if (tok.type != WHY_JSON_ARRAY && tok.type != WHY_JSON_OBJECT &&           \
         tok.type != WHY_JSON_NULL) {                                           \
@@ -38,7 +38,7 @@
 
 #define expect_next_array_value(expect_type, val_type, expect_value)           \
   do {                                                                         \
-    obs_test_true(why_json_next(&tok, &it));                                   \
+    obs_test_true(json_next(&tok, &it));                                       \
     obs_test_eq(uint8_t, (expect_type), tok.type);                             \
     if (tok.type != WHY_JSON_STRING && tok.type != WHY_JSON_FLT &&             \
         tok.type != WHY_JSON_INT && tok.type != WHY_JSON_BOOL) {               \
@@ -56,7 +56,7 @@
 
 #define expect_next_type(expect_type)                                          \
   do {                                                                         \
-    obs_test_true(why_json_next(&tok, &it));                                   \
+    obs_test_true(json_next(&tok, &it));                                       \
     obs_test_eq(uint8_t, expect_type, tok.type);                               \
     if (tok.type != WHY_JSON_END && tok.type != WHY_JSON_OBJECT_END &&         \
         tok.type != WHY_JSON_ARRAY_END && tok.type != WHY_JSON_ARRAY &&        \
@@ -69,7 +69,7 @@
 
 #define expect_error(err)                                                      \
   do {                                                                         \
-    obs_test_false(why_json_next(&tok, &it));                                  \
+    obs_test_false(json_next(&tok, &it));                                      \
     obs_test_eq(int, errno, err);                                              \
     obs_test_eq(uint8_t, tok.type, WHY_JSON_ERROR);                            \
   } while (0)
@@ -78,13 +78,13 @@
   WhyJsonIt it;                                                                \
   WhyJsonTok tok;                                                              \
   errno = 0;                                                                   \
-  obs_test_true(why_json_str(&it, str));
+  obs_test_true(json_str(&it, str));
 
 #define setup_file(filename)                                                   \
   FILE *file = fopen(filename, "r");                                           \
   WhyJsonIt it;                                                                \
   WhyJsonTok tok;                                                              \
   errno = 0;                                                                   \
-  obs_test_true(why_json_file(&it, file));
+  obs_test_true(json_file(&it, file));
 
 #endif
