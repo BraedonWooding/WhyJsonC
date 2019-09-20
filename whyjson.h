@@ -262,6 +262,9 @@ _WHY_JSON_FUNC_ char *json_get_str(JsonStr *str, size_t *len);
 /*
  Report an error.  Given a format and some var args.
  */
+#ifdef __GNUC__
+  __attribute__ (( format( printf, 3, 4 ) ))
+#endif
 _WHY_JSON_FUNC_ int json_internal_error(JsonIt *it, int err, const char *fmt,
                                         ...);
 
@@ -437,12 +440,14 @@ static const uint8_t utf8d[] = {
 /* clang-format on */
 
 _WHY_JSON_FUNC_ char *json_get_str(JsonStr *str, size_t *len) {
-  if (len) {
-    *len = str->len;
-  }
   if (!str->buf) {
     return NULL;
   }
+
+  if (len) {
+    *len = str->len;
+  }
+
   if (str->allocated) {
     str->allocated = 0;
     char *tmp = (char *)str->buf;
@@ -456,6 +461,7 @@ _WHY_JSON_FUNC_ char *json_get_str(JsonStr *str, size_t *len) {
   }
 }
 
+ 
 _WHY_JSON_FUNC_ int json_internal_error(JsonIt *it, int err, const char *fmt,
                                         ...) {
   va_list ap;
