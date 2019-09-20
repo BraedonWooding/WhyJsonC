@@ -317,7 +317,7 @@ _WHY_JSON_FUNC_ int json_internal_is_whitespace(char c);
 /*
  Ignore all whitespace moving the iterator to the first non-whitespace char
  */
-_WHY_JSON_FUNC_ int json_internal_ignore_whitespace(JsonIt *it);
+_WHY_JSON_FUNC_ void json_internal_ignore_whitespace(JsonIt *it);
 
 /*
  Resize the match stack to allow atleast one more member.
@@ -665,22 +665,10 @@ _WHY_JSON_FUNC_ int json_internal_is_whitespace(char c) {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-_WHY_JSON_FUNC_ int json_internal_ignore_whitespace(JsonIt *it) {
-  while (1) {
-    if (it->cur_loc == it->buf_len && !json_internal_read(it)) {
-      return 0;
-    }
-    if (it->buf_len == 0) {
-      break;
-    }
-
-    if (json_internal_is_whitespace(json_internal_peek_char(it))) {
-      json_internal_next_char(it);
-    } else {
-      break;
-    }
+_WHY_JSON_FUNC_ void json_internal_ignore_whitespace(JsonIt *it) {
+  while (json_internal_is_whitespace(json_internal_peek_char(it))) {
+    json_internal_next_char(it);
   }
-  return 1;
 }
 
 _WHY_JSON_FUNC_ int json_internal_resize_match_stack(JsonIt *it) {
@@ -703,11 +691,6 @@ _WHY_JSON_FUNC_ int json_internal_resize_match_stack(JsonIt *it) {
 }
 
 _WHY_JSON_FUNC_ int json_internal_count_braces(JsonTok *tok, JsonIt *it) {
-  if (!json_internal_ignore_whitespace(it)) {
-    tok->type = JSON_ERROR;
-    return 0;
-  }
-
   char open = '[';
   char close = ']';
   uint8_t end_type = JSON_ARRAY_END;
@@ -743,11 +726,6 @@ _WHY_JSON_FUNC_ int json_internal_count_braces(JsonTok *tok, JsonIt *it) {
 
     if (WHY_JSON_GET_COUNT(--it->match_stack[it->match_len - 1]) == 0) {
       it->match_stack[--it->match_len] = 0;
-    }
-
-    if (!json_internal_ignore_whitespace(it)) {
-      tok->type = JSON_ERROR;
-      return 0;
     }
 
     tok->type = end_type;
@@ -853,10 +831,26 @@ _WHY_JSON_FUNC_ int json_internal_to_utf8(char **tmp, size_t *tmp_len,
 
 _WHY_JSON_FUNC_ int json_internal_parse_str_till(JsonStr *out, JsonIt *it,
                                                  char ending) {
-  char *tmp = malloc(sizeof(char));
-  size_t tmp_len = 0;
-  size_t tmp_cap = 0;
+  char *tmp;
+  size_t tmp_len;
+  size_t tmp_cap;
+  if (out->allocated && out->buf) {
+    tmp = (char *)out->buf;
+    tmp_len = 0;
+    tmp_cap = tmp_len;
+  } else {
+    tmp = malloc(sizeof(char) * 9);
+    tmp_len = 0;
+    tmp_cap = 8;
+  }
   tmp[0] = '\0';
+
+  if (out->buf) {
+    out->buf = NULL;
+    out->len = 0;
+    out->allocated = 0;
+  }
+
   int next = 0;
 
   while (1) {
@@ -1004,10 +998,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_identifier(JsonStr *out, JsonIt *it) {
 }
 
 _WHY_JSON_FUNC_ int json_internal_parse_key(JsonTok *tok, JsonIt *it) {
-  if (!json_internal_ignore_whitespace(it)) {
-    return 0;
-  }
-
   if (json_internal_peek_char(it) == '"') {
     json_internal_next_char(it);
     if (!json_internal_parse_str_till(&tok->key, it, '"')) {
@@ -1135,16 +1125,13 @@ _WHY_JSON_FUNC_ int json_internal_parse_num(JsonType *type, JsonValue *value,
 
 _WHY_JSON_FUNC_ int json_internal_parse_value(JsonType *type, JsonValue *value,
                                               JsonIt *it) {
-  if (!json_internal_ignore_whitespace(it)) {
-    return 0;
-  }
-
   int next = json_internal_peek_char(it);
   if (next == '"') {
     *type = JSON_STRING;
     json_internal_next_char(it);
     return json_internal_parse_str_till(&value->_str, it, '"');
-  } else if (next == 't') {
+  }
+  if (next == 't') {
     int res = json_internal_matches("true", it);
     if (res == -1) {
       return 0;
@@ -1199,10 +1186,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_opening_braces(JsonIt *it) {
   }
 
   it->depth++;
-  if (!json_internal_ignore_whitespace(it)) {
-    return 0;
-  }
-
   if (it->match_len > 0 &&
       (it->match_stack[it->match_len - 1] & 0x80) == mask &&
       WHY_JSON_CAN_ADD(it->match_stack[it->match_len - 1])) {
@@ -1212,10 +1195,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_opening_braces(JsonIt *it) {
       return 0;
     }
     it->match_stack[it->match_len++] = 1 | mask;
-  }
-
-  if (it->buf_len == it->cur_loc && !json_internal_ignore_whitespace(it)) {
-    return 0;
   }
 
   return 1;
@@ -1228,10 +1207,10 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
        (it->stream != NULL && !feof(it->stream)))) {
     memset(tok, 0, sizeof(JsonTok));
     tok->first = 1;
-
+    json_internal_ignore_whitespace(it);
     /* This means single value and no object / array */
-    if (json_internal_parse_value(&tok->type, &tok->value, it) &&
-        json_internal_ignore_whitespace(it)) {
+    if (json_internal_parse_value(&tok->type, &tok->value, it)) {
+      json_internal_ignore_whitespace(it);
       if (tok->type != JSON_ARRAY && tok->type != JSON_OBJECT &&
           json_internal_peek_char(it) != EOF) {
         /*
@@ -1250,16 +1229,13 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
     return 0;
   }
 
-  if (!json_internal_ignore_whitespace(it)) {
-    json_destroy(tok, it);
-    return 0;
-  }
+  json_internal_ignore_whitespace(it);
 
   tok->first = 0;
   int prev_was_key = tok->type == JSON_ARRAY || tok->type == JSON_OBJECT;
-
-  /* Deallocate strings but not iterator */
-  json_destroy(tok, NULL);
+  if (tok->type == JSON_STRING) {
+    json_internal_free_str(&tok->value._str);
+  }
 
   if (prev_was_key) {
     if (!json_internal_parse_opening_braces(it)) {
@@ -1270,23 +1246,31 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
     }
   }
 
+  json_internal_ignore_whitespace(it);
+
   int comma_done = 0;
 #ifndef WHY_JSON_STRICT
   if (json_internal_peek_char(it) == ',') {
     comma_done = 1;
     json_internal_next_char(it);
+    json_internal_ignore_whitespace(it);
   }
 #endif
 
   if (!json_internal_count_braces(tok, it)) {
     if (errno == JSON_ERR_NO_ERROR) {
+      uint8_t tok_type = tok->type;
+      json_destroy(tok, NULL);
       tok->first = 1;
+      tok->type = tok_type;
       return 1;
     } else {
       json_destroy(tok, it);
       return 0;
     }
   }
+
+  json_internal_ignore_whitespace(it);
 
   if ((it->cur_loc >= it->source_str_len && it->source_str != NULL) ||
       (it->stream != NULL && feof(it->stream))) {
@@ -1302,10 +1286,7 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
     return 0;
   }
 
-  if (!json_internal_ignore_whitespace(it)) {
-    json_destroy(tok, it);
-    return 0;
-  }
+  json_internal_ignore_whitespace(it);
 
   if (it->match_len == 0 ||
       (it->match_stack[it->match_len - 1] & 0x80) == 0x80) {
@@ -1314,10 +1295,7 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
       return 0;
     }
 
-    if (!json_internal_ignore_whitespace(it)) {
-      json_destroy(tok, it);
-      return 0;
-    }
+    json_internal_ignore_whitespace(it);
 
     int next = json_internal_next_char(it);
     if (next == EOF || next != ':') {
@@ -1327,10 +1305,9 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
       return 0;
     }
 
-    if (!json_internal_ignore_whitespace(it)) {
-      json_destroy(tok, it);
-      return 0;
-    }
+    json_internal_ignore_whitespace(it);
+  } else {
+    json_destroy(tok, NULL);
   }
 
   if (json_internal_parse_value(&tok->type, &tok->value, it) != 1) {

@@ -1,15 +1,17 @@
-#include "whyjson.h"
+#include "../whyjson.h"
 
-int main(void) {
-  char *json =
-      "{ \"a\": 2, \"b\": \"Coolies 🎫\", \"c\": [1, 2, []], \"k\": 5.4, \"c\": "
-      "\"\\u0068\\u0065\\u006c\\u006c\\u006F\", \"d\": \"\\U00010437\" }";
-  WhyJsonIt it;
-  why_json_str(&it, json);
-  WhyJsonTok tok;
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    fprintf(stderr, "Error: Provide a json file to load");
+    return 1;
+  }
+
+  JsonIt it;
+  json_file(&it, fopen(argv[1], "r"));
+  JsonTok tok;
   int first = 1;
   errno = 0;
-  while (why_json_next(&tok, &it) && tok.type != WHY_JSON_END) {
+  while (json_next(&tok, &it) && tok.type != JSON_END) {
     if (!first) {
       printf((!tok.first) ? ",\n" : "\n");
     } else {
@@ -22,37 +24,34 @@ int main(void) {
       printf("\"%s\": ", tok.key.buf);
     }
     switch (tok.type) {
-    case WHY_JSON_ARRAY: {
+    case JSON_ARRAY: {
       printf("[");
     } break;
-    case WHY_JSON_OBJECT: {
+    case JSON_OBJECT: {
       printf("{");
     } break;
-    case WHY_JSON_ARRAY_END: {
+    case JSON_ARRAY_END: {
       printf("]");
     } break;
-    case WHY_JSON_OBJECT_END: {
+    case JSON_OBJECT_END: {
       printf("}");
     } break;
-    case WHY_JSON_NONE: {
-      printf("NONE");
-    } break;
-    case WHY_JSON_STRING: {
+    case JSON_STRING: {
       printf("%s", tok.value._str.buf);
     } break;
-    case WHY_JSON_BOOL: {
+    case JSON_BOOL: {
       printf("%s", tok.value._bool ? "true" : "false");
     } break;
-    case WHY_JSON_INT: {
+    case JSON_INT: {
       printf("%ld", tok.value._int);
     } break;
-    case WHY_JSON_FLT: {
+    case JSON_FLT: {
       printf("%lf", tok.value._flt);
     } break;
-    case WHY_JSON_NULL: {
+    case JSON_NULL: {
       printf("null");
     } break;
-    case WHY_JSON_ERROR: {
+    case JSON_ERROR: {
       printf("Error!!! %s", it.err);
     } break;
     default: { printf("Unknown: %d\n", tok.type); } break;
@@ -60,7 +59,7 @@ int main(void) {
   }
   printf("\n");
   if (errno != 0) {
-    printf("%d: %s, %c\n", errno, it.err, it.invalid_char);
+    printf("%d: %s\n", errno, it.err);
   }
 
   return 0;
