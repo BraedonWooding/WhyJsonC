@@ -91,11 +91,9 @@ SOFTWARE.
 extern "C" {
 #endif
 
-typedef struct json_it_t JsonIt;
-typedef struct json_tok_t JsonTok;
-typedef union json_value_t JsonValue;
-typedef struct json_str_t JsonStr;
-
+/*
+ Represents all possible json errors.
+ */
 typedef int JsonErr;
 enum json_err_t {
   JSON_ERR_NO_ERROR = 0,
@@ -113,6 +111,9 @@ enum json_err_t {
   JSON_ERR_INVALID_VALUE = -12,
 };
 
+/*
+ Represents an object's data type.
+ */
 typedef uint8_t JsonType;
 enum json_type_t {
   JSON_ERROR = 0,
@@ -128,14 +129,28 @@ enum json_type_t {
   JSON_END = 11,
 };
 
+/*
+ Represents a json string
+ i.e. for keys and for string values
+
+ Can grab a mutable copy of buf via json_get_string()
+ Which will often just toggle the allocation flag
+ and clear the buf/len fields to avoid having to allocate
+ */
+typedef struct json_str_t JsonStr;
 struct json_str_t {
+  /* TODO: Pack */
   const char *buf;
   size_t len;
-  // was this allocated you can toggle this off if you want
-  // to control the allocation from now on
   int allocated;
 };
 
+/*
+ Represents a json value
+ i.e. num, string, or bool
+ NULL is represented as purely just a type
+ */
+typedef union json_value_t JsonValue;
 union json_value_t {
   long _int;
   double _flt;
@@ -143,17 +158,32 @@ union json_value_t {
   int _bool;
 };
 
+/*
+ Represents a token from json.
+ The token may have a key, will have a type
+ and if the type is JSON_STRING, JSON_INT, JSON_BOOL
+ or JSON_FLT then it will also have a value.
+
+ First represents if the token is the first inside it's array/object
+ JSON_OBJECT_END, JSON_ARRAY_END are always first.
+ */
+typedef struct json_tok_t JsonTok;
 struct json_tok_t {
+  /* TODO: Pack */
   JsonStr key;
   JsonType type;
   JsonValue value;
-  int first; // is this the first token for this array/object
+  int first;
 };
 
+/*
+ Holds the iterator structure itself.
+ Avoid touching this too much outside of cur_line/cur_col/depth/err
+ */
+typedef struct json_it_t JsonIt;
 struct json_it_t {
+  /* TODO: Pack */
   FILE *stream;
-  // Either you'll use a stream or a source string
-  // The other will be NULL
   const char *source_str;
   size_t source_str_len;
   size_t source_str_cur;
@@ -170,9 +200,6 @@ struct json_it_t {
   int depth;
   uint32_t state;
 
-  // - Try to keep the buffer size greater than
-  //   the key size + element size else we'll have to malloc them
-  //   and it'll oncur a performance hit
   char buf[WHY_JSON_BUF_SIZE + 1];
   size_t buf_len;
 };
@@ -382,31 +409,32 @@ _WHY_JSON_FUNC_ int json_internal_parse_value(JsonType *type, JsonValue *value,
  */
 _WHY_JSON_FUNC_ int json_internal_parse_opening_braces(JsonIt *it);
 
-// == Definitions ==
+/* == Definitions == */
 
-// Taken UTF8 validation from online since building it myself seemed annoying
-// Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
-// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
+/*
+  Taken UTF8 validation from online since building it myself seemed annoying
+  Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+  See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
+*/
 
-// clang format doesn't like this
-// clang-format off
+/* clang-format off */
 static const uint8_t utf8d[] = {
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 00..1f
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 20..3f
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 40..5f
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 60..7f
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, // 80..9f
-7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, // a0..bf
-8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, // c0..df
-0xa,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x4,0x3,0x3, // e0..ef
-0xb,0x6,0x6,0x6,0x5,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8, // f0..ff
-0x0,0x1,0x2,0x3,0x5,0x8,0x7,0x1,0x1,0x1,0x4,0x6,0x1,0x1,0x1,0x1, // s0..s0
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,1, // s1..s2
-1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1, // s3..s4
-1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,3,1,1,1,1,1,1, // s5..s6
-1,3,1,1,1,1,1,3,1,3,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // s7..s8
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, /* 00..1f */
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, /* 20..3f */
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, /* 40..5f */
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, /* 60..7f */
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, /* 80..9f */
+  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, /* a0..bf */
+  8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, /* c0..df */
+  0xa,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x4,0x3,0x3, /* e0..ef */
+  0xb,0x6,0x6,0x6,0x5,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8, /* f0..ff */
+  0x0,0x1,0x2,0x3,0x5,0x8,0x7,0x1,0x1,0x1,0x4,0x6,0x1,0x1,0x1,0x1, /* s0..s0 */
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,1, /* s1..s2 */
+  1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1, /* s3..s4 */
+  1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,3,1,1,1,1,1,1, /* s5..s6 */
+  1,3,1,1,1,1,1,3,1,3,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1, /* s7..s8 */
 };
-// clang-format on
+/* clang-format on */
 
 _WHY_JSON_FUNC_ char *json_get_str(JsonStr *str, size_t *len) {
   if (len) {
@@ -481,7 +509,6 @@ _WHY_JSON_FUNC_ int json_internal_read(JsonIt *it) {
     it->buf_len = fread(it->buf, 1, WHY_JSON_BUF_SIZE, it->stream);
     if (it->buf_len == 0) {
       if (feof(it->stream)) {
-        // EOF isn't an error
         it->buf_len = 0;
         it->buf[0] = '\0';
         return 1;
@@ -489,7 +516,6 @@ _WHY_JSON_FUNC_ int json_internal_read(JsonIt *it) {
         json_internal_error(it, JSON_ERR_CANT_READ, "Failed to read");
         return 0;
       } else {
-        // unknown error
         json_internal_error(it, JSON_ERR_UNDEFINED_NEXT_CHAR, "Unknown Error");
         return 0;
       }
@@ -499,7 +525,6 @@ _WHY_JSON_FUNC_ int json_internal_read(JsonIt *it) {
   } else if (it->source_str != NULL) {
     size_t remaining = it->source_str_len - it->source_str_cur;
     if (remaining == 0) {
-      // EOF
       it->buf_len = 0;
       it->buf[0] = '\0';
       return 1;
@@ -517,7 +542,6 @@ _WHY_JSON_FUNC_ int json_internal_read(JsonIt *it) {
     return 0;
   }
 
-  // verify that the json is legal
   size_t stop;
   it->state =
       json_internal_is_legal_utf8(&it->state, it->buf, it->buf_len, &stop);
@@ -560,7 +584,11 @@ _WHY_JSON_FUNC_ int json_internal_init(JsonIt *it) {
   }
 
   memset(it->match_stack, 0, sizeof(uint8_t) * WHY_JSON_INITIAL_MATCH_STACK);
-  // our 'null terminating' char
+  /*
+    This acts as a null terminating character for us
+    TODO: Is this even worth the memory saved..
+          It is quite esoteric idk..
+  */
   it->match_stack[WHY_JSON_INITIAL_MATCH_STACK - 1] = UINT8_MAX;
   return 1;
 }
@@ -643,7 +671,6 @@ _WHY_JSON_FUNC_ int json_internal_ignore_whitespace(JsonIt *it) {
       return 0;
     }
     if (it->buf_len == 0) {
-      // EOF means no more whitespace
       break;
     }
 
@@ -657,8 +684,10 @@ _WHY_JSON_FUNC_ int json_internal_ignore_whitespace(JsonIt *it) {
 }
 
 _WHY_JSON_FUNC_ int json_internal_resize_match_stack(JsonIt *it) {
-  // if the next one is uint8_max then we have found end
-  // of our buffer and we have to reallocate
+  /*
+   if the next one is uint8_max then we have found end
+   of our buffer and we have to reallocate
+  */
   if (it->match_stack[it->match_len] == UINT8_MAX) {
     uint8_t *tmp =
         realloc(it->match_stack, sizeof(uint8_t) * it->match_len * 2);
@@ -692,9 +721,7 @@ _WHY_JSON_FUNC_ int json_internal_count_braces(JsonTok *tok, JsonIt *it) {
   }
 
   if (it->buf_len == 0) {
-    // EOF
     if (it->match_len == 0) {
-      // We have no matches and are at EOF this is fine
       tok->type = JSON_END;
       errno = JSON_ERR_NO_ERROR;
       return 0;
@@ -753,7 +780,7 @@ _WHY_JSON_FUNC_ void json_destroy(JsonTok *tok, JsonIt *it) {
     if (tok->type == JSON_STRING && tok->value._str.buf) {
       json_internal_free_str(&tok->value._str);
     }
-    // NOTE: Error is the default value
+    /* NOTE: Error is the default value */
     tok->type = JSON_ERROR;
   }
 }
@@ -777,7 +804,8 @@ _WHY_JSON_FUNC_ int json_internal_hex(int c) {
 _WHY_JSON_FUNC_ int
 json_internal_parse_codepoint(JsonIt *it, uint32_t *codepoint, int len) {
   *codepoint = 0;
-  for (int i = 0; i < len; i++) {
+  int i;
+  for (i = 0; i < len; i++) {
     int c = json_internal_next_char(it);
     int hex = json_internal_hex(c);
     if (c == EOF || hex == -1) {
@@ -838,7 +866,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_str_till(JsonStr *out, JsonIt *it,
     }
 
     if (next == ending) {
-      // success!
       break;
     } else if (next == '\\') {
       int c = json_internal_next_char(it);
@@ -851,8 +878,7 @@ _WHY_JSON_FUNC_ int json_internal_parse_str_till(JsonStr *out, JsonIt *it,
         uint32_t low = 0;
         uint32_t high = 0;
         if (cp >= 0xD800 && cp <= 0xDBFF) {
-          // we have the high point
-          // now need low
+          /* we have the high point now we need low */
           high = cp;
           cp = 0;
           c = json_internal_next_char(it);
@@ -944,18 +970,22 @@ _WHY_JSON_FUNC_ int json_internal_parse_str_till(JsonStr *out, JsonIt *it,
 }
 
 _WHY_JSON_FUNC_ int json_internal_parse_identifier(JsonStr *out, JsonIt *it) {
-  // We support identifiers that are just numbers
-  // but also identifiers that are a sequence of any bytes before a `:`
-  // we don't support multi-line identifiers
-  // We also cut all trailing spaces
+  /*
+   We support identifiers that are just numbers
+   but also identifiers that are a sequence of any bytes before a `:`
+   we don't support multi-line identifiers
+   We also cut all trailing spaces
+  */
   if (!json_internal_parse_str_till(out, it, ':')) {
     return 0;
   }
 
-  // note we have to then backtrack one so that our cur_loc is on ':'
-  // @DEBT: @NOTE: We are taking some technical debt here
-  // But since strings can't have newlines in them this isn't too bad
-  // Just gotta be a bit more careful.
+  /*
+   note we have to then backtrack one so that our cur_loc is on ':'
+   @DEBT: @NOTE: We are taking some technical debt here
+   But since strings can't have newlines in them this isn't too bad
+   Just gotta be a bit more careful.
+  */
   it->cur_loc--;
   it->cur_col--;
   while (out->len > 0 && json_internal_is_whitespace(out->buf[out->len - 1])) {
@@ -963,10 +993,12 @@ _WHY_JSON_FUNC_ int json_internal_parse_identifier(JsonStr *out, JsonIt *it) {
   }
   ((char *)out->buf)[out->len] = '\0';
 
-  // NOTE: Do we want to realloc this to make the buffer smaller
-  //       Is it expected of us??
-  // NOTE: An empty identifier is still valid, should it be?
-  //       I used to think NO, then I thought YES now I'm back to NO
+  /*
+   NOTE: Do we want to realloc this to make the buffer smaller
+         Is it expected of us??
+   NOTE: An empty identifier is still valid, should it be?
+         I used to think NO, then I thought YES now I'm back to NO
+  */
 
   return 1;
 }
@@ -977,7 +1009,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_key(JsonTok *tok, JsonIt *it) {
   }
 
   if (json_internal_peek_char(it) == '"') {
-    // this is a valid key
     json_internal_next_char(it);
     if (!json_internal_parse_str_till(&tok->key, it, '"')) {
       return 0;
@@ -1011,8 +1042,6 @@ _WHY_JSON_FUNC_ int json_internal_matches(const char *str, JsonIt *it) {
     }
   }
 
-  // make sure the next character is not some kind of possible part of the
-  // string i.e. just check it is a comma or whitespace
   int peek = json_internal_peek_char(it);
   if (*str != '\0' ||
       (peek != EOF && !json_internal_is_whitespace(peek) && peek != ',')) {
@@ -1059,11 +1088,9 @@ _WHY_JSON_FUNC_ int json_internal_parse_num(JsonType *type, JsonValue *value,
       json_internal_error(it, JSON_ERR_INVALID_VALUE, "Unexpected EOF");
       return 0;
     } else if (next >= '0' && next <= '9') {
-      // this is fine
       json_internal_into_buf(&tmp, &tmp_len, &tmp_cap, it, next);
       prev_exp = prev_underscore = 0;
     } else if (next == '.' && !seen_dot && !seen_exp) {
-      // still fine if only one
       seen_dot = 1;
       json_internal_into_buf(&tmp, &tmp_len, &tmp_cap, it, next);
       prev_underscore = 0;
@@ -1076,7 +1103,7 @@ _WHY_JSON_FUNC_ int json_internal_parse_num(JsonType *type, JsonValue *value,
       prev_underscore = 0;
       *type = JSON_FLT;
     } else if (next == '_' && !prev_underscore) {
-      // ignore underscores
+      /* ignore underscores */
       prev_underscore = 1;
     } else if ((next == '+' || next == '-') && prev_exp) {
       prev_exp = prev_underscore = 0;
@@ -1089,8 +1116,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_num(JsonType *type, JsonValue *value,
   }
 
   if (tmp_len - seen_dot == 0) {
-    // NOTE: Do we have to do this??  Or does it automatically check for null
-    // strings
     json_internal_error(it, JSON_ERR_INVALID_VALUE, "Not a valid number %s",
                         tmp ? tmp : "null");
     free(tmp);
@@ -1116,12 +1141,10 @@ _WHY_JSON_FUNC_ int json_internal_parse_value(JsonType *type, JsonValue *value,
 
   int next = json_internal_peek_char(it);
   if (next == '"') {
-    // parse str
     *type = JSON_STRING;
     json_internal_next_char(it);
     return json_internal_parse_str_till(&value->_str, it, '"');
   } else if (next == 't') {
-    // true
     int res = json_internal_matches("true", it);
     if (res == -1) {
       return 0;
@@ -1131,7 +1154,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_value(JsonType *type, JsonValue *value,
       return 1;
     }
   } else if (next == 'f') {
-    // false
     int res = json_internal_matches("false", it);
     if (res == -1) {
       return 0;
@@ -1141,7 +1163,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_value(JsonType *type, JsonValue *value,
       return 1;
     }
   } else if (next == 'n') {
-    // null
     int res = json_internal_matches("null", it);
     if (res == -1) {
       return 0;
@@ -1150,21 +1171,14 @@ _WHY_JSON_FUNC_ int json_internal_parse_value(JsonType *type, JsonValue *value,
       return 1;
     }
   } else if (next == '{') {
-    // object
-    // we don't want to move forward because our next
-    // need to know this
     *type = JSON_OBJECT;
     return 1;
   } else if (next == '[') {
-    // array
     *type = JSON_ARRAY;
     return 1;
   } else if (next == EOF) {
     json_internal_error(it, JSON_ERR_INVALID_VALUE, "Unexpected EOF");
   } else if (json_internal_parse_num(type, value, it)) {
-    // number/int
-    // TODO: Do we want someway to see if the parse num failed?
-    //       idk maybe?
     return 1;
   } else {
     json_internal_error(it, JSON_ERR_INVALID_VALUE, "Expected value and not %c",
@@ -1215,14 +1229,15 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
     memset(tok, 0, sizeof(JsonTok));
     tok->first = 1;
 
-    // we are at the start
-    // this just means we have a single value
+    /* This means single value and no object / array */
     if (json_internal_parse_value(&tok->type, &tok->value, it) &&
         json_internal_ignore_whitespace(it)) {
       if (tok->type != JSON_ARRAY && tok->type != JSON_OBJECT &&
           json_internal_peek_char(it) != EOF) {
-        // if we are not at EOF then clearly something is wrong
-        // i.e. "a": 2, "b": 3 is not valid
+        /*
+         if we are not at EOF then clearly something is wrong
+         i.e. "a": 2, "b": 3 is not valid
+        */
         json_internal_error(it, JSON_ERR_UNKNOWN_TOK,
                             "Expected EOF since single value was read");
         json_destroy(tok, it);
@@ -1241,10 +1256,9 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
   }
 
   tok->first = 0;
-  // was the previous a key for object/array
   int prev_was_key = tok->type == JSON_ARRAY || tok->type == JSON_OBJECT;
 
-  // Deallocate the strings but not the iterator
+  /* Deallocate strings but not iterator */
   json_destroy(tok, NULL);
 
   if (prev_was_key) {
@@ -1266,9 +1280,6 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
 
   if (!json_internal_count_braces(tok, it)) {
     if (errno == JSON_ERR_NO_ERROR) {
-      // We count all ending braces ] as being first
-      // This just helps most algorithms treat them
-      // as special.
       tok->first = 1;
       return 1;
     } else {
@@ -1279,7 +1290,7 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
 
   if ((it->cur_loc >= it->source_str_len && it->source_str != NULL) ||
       (it->stream != NULL && feof(it->stream))) {
-    // The token stream has finished so cleanup
+    /* Cleanup */
     json_destroy(tok, it);
     tok->type = JSON_END;
     return 1;
@@ -1296,7 +1307,6 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
     return 0;
   }
 
-  // parse key
   if (it->match_len == 0 ||
       (it->match_stack[it->match_len - 1] & 0x80) == 0x80) {
     if (!json_internal_parse_key(tok, it)) {
@@ -1311,7 +1321,6 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
 
     int next = json_internal_next_char(it);
     if (next == EOF || next != ':') {
-      // EOF
       json_destroy(tok, it);
       json_internal_error(it, JSON_ERR_UNKNOWN_TOK,
                           "Didn't expect %c was expecting ':'", next);
@@ -1324,7 +1333,6 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
     }
   }
 
-  // then parse value
   if (json_internal_parse_value(&tok->type, &tok->value, it) != 1) {
     json_destroy(tok, it);
     return 0;

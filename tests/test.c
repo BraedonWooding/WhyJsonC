@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
   OBS_SETUP("Json", argc, argv);
 
   OBS_TEST_GROUP("Types", {
-    ; // To make this formatted nicely we can just chuck this
+    ;
     OBS_TEST("Number", {
       setup_str("{ \"a\": 5, \"b\": 10 }");
       expect_next_type(JSON_OBJECT);
@@ -146,7 +146,11 @@ int main(int argc, char *argv[]) {
 
     OBS_TEST("Full Codepoint", {
       setup_str("\"\\U00010348\"");
+#if !defined __STDC_VERSION__ || __STDC_VERSION__ < 199901L
+      expect_next_array_string("𐍈");
+#else
       expect_next_array_string("\U00010348");
+#endif
     })
 
     OBS_TEST("Surrogate halves wrong order", {
@@ -295,7 +299,7 @@ int main(int argc, char *argv[]) {
 
 #ifndef JSON_STRICT
   OBS_TEST_GROUP("Non strict", {
-    ; // TODO
+    ;
     OBS_TEST("Extra Commmas", {
       setup_str("{ \"a\": 2, \"b\": [1, ], }");
       expect_next_type(JSON_OBJECT);
@@ -332,7 +336,7 @@ int main(int argc, char *argv[]) {
     })
 
     OBS_TEST("Extra commas array", {
-      // TODO: Make the error more accurate
+      /* TODO: Make the error more accurate */
       setup_str("[ 2, ]");
       expect_next_type(JSON_ARRAY);
       expect_next_array_value(JSON_INT, long, 2);
@@ -341,9 +345,8 @@ int main(int argc, char *argv[]) {
   })
 #endif
 
-  OBS_TEST_GROUP("Files", {
-    ; // Collected from the internet
-  })
+  /* TODO */
+  OBS_TEST_GROUP("Files", {})
 
   OBS_REPORT;
   return tests_failed;
