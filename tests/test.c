@@ -51,14 +51,18 @@ int main(int argc, char *argv[]) {
     })
 
     OBS_TEST("Float", {
-      setup_str("{ \"a\": 2.2, \"b\": 0.0, \"c\": 4.3e+9, \"d\": 2e-10, \"e\": "
-                "-4.4e22 }");
+      setup_str(
+          "{ \"a\": 2.2, \"b\": +0.0, \"c\": 4.3e+9, \"d\": 2e-10, \"e\": "
+          "-4.4e22, \"f\": -.03, \"g\": 3.e9, \"h\": .0e10 }");
       expect_next_type(JSON_OBJECT);
       expect_next_obj_value(JSON_FLT, "a", double, 2.2);
-      expect_next_obj_value(JSON_FLT, "b", double, 0.0);
+      expect_next_obj_value(JSON_FLT, "b", double, +0.0);
       expect_next_obj_value(JSON_FLT, "c", double, 4.3e+9);
       expect_next_obj_value(JSON_FLT, "d", double, 2e-10);
       expect_next_obj_value(JSON_FLT, "e", double, -4.4e22);
+      expect_next_obj_value(JSON_FLT, "f", double, -.03);
+      expect_next_obj_value(JSON_FLT, "g", double, 3.e9);
+      expect_next_obj_value(JSON_FLT, "h", double, .0e10);
       expect_next_type(JSON_OBJECT_END);
       expect_next_type(JSON_END);
       obs_test_eq(int, errno, 0);
@@ -168,6 +172,76 @@ int main(int argc, char *argv[]) {
     OBS_TEST("String with newlines", {
       setup_str("\"1, 2, 34\n\"");
       expect_error(JSON_ERR_MISSING_QUOTE);
+    })
+
+    OBS_TEST("Just a dot (invalid num)", {
+      setup_str(".");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Just an exponent (invalid num)", {
+      setup_str("e");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Exponent with value (invalid num)", {
+      setup_str("e10");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Just a dot and exponent (invalid num)", {
+      setup_str(".e");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Just a dot and exponent with value (invalid num)", {
+      setup_str(".e93");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Just a sign (invalid num)", {
+      setup_str("+");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Sign and dot (invalid num)", {
+      setup_str("+.");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Sign and exp (invalid num)", {
+      setup_str("+e");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Sign and dot and exp (invalid num)", {
+      setup_str("+.e");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Double dot (invalid num)", {
+      setup_str("1.2.3");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple exponents (invalid num)", {
+      setup_str("3e+9e-10");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple exponents and dots (invalid num)", {
+      setup_str("+10.3e9.2e4.2");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple signs (invalid num)", {
+      setup_str("+--2");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Exponents multiple signs (invalid num)", {
+      setup_str("3e++9");
+      expect_error(JSON_ERR_INVALID_VALUE);
     })
 
 #ifndef JSON_STRICT

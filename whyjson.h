@@ -815,8 +815,11 @@ _WHY_JSON_FUNC_ int json_internal_matches(const char *str, JsonIt *it) {
 _WHY_JSON_FUNC_ int json_internal_parse_num(JsonType *type, JsonValue *value,
                                             JsonIt *it) {
   int sign = 1;
-  if (json_internal_peek_char(it) == '-') {
+  int peek = json_internal_peek_char(it);
+  if (peek == '-') {
     sign = -1;
+    json_internal_next_char(it);
+  } else if (peek == '+') {
     json_internal_next_char(it);
   }
 
