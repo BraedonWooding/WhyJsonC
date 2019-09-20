@@ -52,14 +52,20 @@ SOFTWARE.
 #define WHY_JSON_PATCH_V "a"
 
 #define WHY_JSON_VERSION                                                       \
-  WHY_JSON_MAJOR_V "." WHY_JSON_MINOR_V "." WHY_JSON_PATCH_V
+  (WHY_JSON_MAJOR_V "." WHY_JSON_MINOR_V "." WHY_JSON_PATCH_V)
+
+#if defined WHY_JSON_NO_DEFINITIONS
+#define WHY_JSON_STATIC
+#else
+#define WHY_JSON_STATIC static
+#endif
 
 #if defined _MSC_VER || defined __MINGW32__ || defined _WIN32
-#define _WHY_JSON_FUNC_ static __inline
+#define _WHY_JSON_FUNC_ WHY_JSON_STATIC __inline
 #elif !defined __STDC_VERSION__ || __STDC_VERSION__ < 199901L
-#define _WHY_JSON_FUNC_ static __inline__
+#define _WHY_JSON_FUNC_ WHY_JSON_STATIC __inline__
 #else
-#define _WHY_JSON_FUNC_ static inline
+#define _WHY_JSON_FUNC_ WHY_JSON_STATIC inline
 #endif
 
 #ifndef WHY_JSON_BUF_SIZE
@@ -172,6 +178,34 @@ struct json_it_t {
 };
 
 /*
+ Use a file as a source for the json iterator.
+ Note: Won't seek to the start so make sure file is set to the location
+       You want reading to start at.
+ */
+_WHY_JSON_FUNC_ int json_file(JsonIt *it, FILE *file);
+
+/*
+ Initialises a json iterator from a constant string
+ You can use literals in this, it won't attempt to edit it.
+ */
+_WHY_JSON_FUNC_ int json_str(JsonIt *it, const char *str);
+
+/*
+  Goes to the next element in the json.  If the current element is at an object
+  or array it will stop at the key allowing you to skip it else if you call
+  next it'll step into it.
+*/
+_WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it);
+
+/*
+  Skips the json object useful for when you just want to visit the outer
+  objects or don't want to visit an object for whatever reason.
+
+  Errors if the current key is not an object or array.
+*/
+_WHY_JSON_FUNC_ int json_skip(JsonTok *tok, JsonIt *it);
+
+/*
  Destroys the given token and iterator data.
  Won't free the token itself nor the iterator since presumably
  you have stack allocated them (or should).
@@ -181,6 +215,16 @@ struct json_it_t {
  */
 _WHY_JSON_FUNC_ void json_destroy(JsonTok *tok, JsonIt *it);
 
+/*
+ If you want a writeable version you can use this
+ It will avoid allocations by just invalidating the string after this call
+
+ Our strings are by default readonly because it is often more efficient
+ and possibly allows us to re-use buffers in the future!
+ Less Allocations are the better.
+ */
+_WHY_JSON_FUNC_ char *json_get_str(JsonStr *str, size_t *len);
+
 #ifndef WHY_JSON_NO_DEFINITIONS
 
 /*
@@ -188,14 +232,157 @@ _WHY_JSON_FUNC_ void json_destroy(JsonTok *tok, JsonIt *it);
   These are helper functions and should not be called by your code
  */
 
+/*
+ Report an error.  Given a format and some var args.
+ */
 _WHY_JSON_FUNC_ int json_internal_error(JsonIt *it, int err, const char *fmt,
                                         ...);
 
+/*
+  Returns JSON_ACCEPT if the json is legal else JSON_REJECT
+  if neither than it needs more characters to determine.
+ */
 _WHY_JSON_FUNC_ uint32_t json_internal_is_legal_utf8(uint32_t *state,
                                                      const char *bytes,
                                                      size_t length,
                                                      size_t *stop);
+
+/*
+  Reads into buffer.
+  Make sure that it->cur_loc == it->buf_len prior to calling this
+  Else you'll lose the rest of the buffer.
+ */
 _WHY_JSON_FUNC_ int json_internal_read(JsonIt *it);
+
+/*
+  Peeks the next character
+ */
+_WHY_JSON_FUNC_ int json_internal_peek_char(JsonIt *it);
+
+/*
+  Gets the next character moving forward cur_loc and cur_col/line
+  Avoid just doing cur_loc++ and prefer using this to make sure
+  our line numbers are right.
+*/
+_WHY_JSON_FUNC_ int json_internal_next_char(JsonIt *it);
+
+/*
+ Initialise the iterator.
+ Prefer to call json_string/json_file rather than initialising it yourself
+ */
+_WHY_JSON_FUNC_ int json_internal_init(JsonIt *it);
+
+/*
+ Writes the character given into the temporary buffer reallocating as needed
+ Uses a typical reallocation as min 4 (start 8) and doubling each time.
+ */
+_WHY_JSON_FUNC_ int json_internal_into_buf(char **tmp, size_t *tmp_len,
+                                           size_t *tmp_cap, JsonIt *it, int c);
+
+/*
+ Is the character whitespace.
+
+ NOTE: As according to the JSON RPC Spec it will only check for ascii
+ whitespace i.e. '\r', '\n', '\t', ' ' and won't check for Unicode whitespace
+ */
+_WHY_JSON_FUNC_ int json_internal_is_whitespace(char c);
+
+/*
+ Ignore all whitespace moving the iterator to the first non-whitespace char
+ */
+_WHY_JSON_FUNC_ int json_internal_ignore_whitespace(JsonIt *it);
+
+/*
+ Resize the match stack to allow atleast one more member.
+ */
+_WHY_JSON_FUNC_ int json_internal_resize_match_stack(JsonIt *it);
+
+/*
+ Count all closing braces and return 0 (with errno == 0 == JSON_ERR_NO_ERROR)
+ If a proper closing brace was found else return 1 if no closing braces were
+ found and return 0 (with errno != 0) if an error occurred.
+
+ TODO: Ugh this is ugly, let's fix it.
+       Honestly we could just return 1 and check the type?
+       Still not great
+ */
+_WHY_JSON_FUNC_ int json_internal_count_braces(JsonTok *tok, JsonIt *it);
+
+/*
+ Free a json string
+ Automatically done for token and iterator upon next or destroy calls
+ so you shouldn't have to do it manually!
+ */
+_WHY_JSON_FUNC_ void json_internal_free_str(JsonStr *str);
+
+/*
+ Does the character need a '\' before it
+ */
+_WHY_JSON_FUNC_ int json_internal_char_needs_escaping(int c);
+
+/*
+ Convert the character to hex equivalent (i.e. 0 => 0, A/a => 10, ...)
+ Returns -1 if it failed to convert.
+ */
+_WHY_JSON_FUNC_ int json_internal_hex(int c);
+
+/*
+ Parse a codepoint of size `len` i.e. used for \uXXXX and \UXXXXXXXX
+ */
+_WHY_JSON_FUNC_ int json_internal_parse_codepoint(JsonIt *it,
+                                                  uint32_t *codepoint, int len);
+
+/*
+ Converts a codepoint to utf8 writing into buf
+ */
+_WHY_JSON_FUNC_ int json_internal_to_utf8(char **tmp, size_t *tmp_len,
+                                          size_t *tmp_cap, JsonIt *it,
+                                          uint32_t cp);
+
+/*
+ Parses a 'string' like object till the given ending character.
+ Will stop at the ending character
+ */
+_WHY_JSON_FUNC_ int json_internal_parse_str_till(JsonStr *out, JsonIt *it,
+                                                 char ending);
+
+/*
+ Parse an identifier that is a key without the quotes
+ */
+_WHY_JSON_FUNC_ int json_internal_parse_identifier(JsonStr *out, JsonIt *it);
+
+/*
+ Parse a key for an object.
+ */
+_WHY_JSON_FUNC_ int json_internal_parse_key(JsonTok *tok, JsonIt *it);
+
+/*
+ Check if the iterator characters match the given string
+ - 1 if they do
+ - 0 if they don't
+ - -1 if error
+ Will stop at the character that failed to match
+ */
+_WHY_JSON_FUNC_ int json_internal_matches(const char *str, JsonIt *it);
+
+/*
+ Parses integers and floats.
+ */
+_WHY_JSON_FUNC_ int json_internal_parse_num(JsonType *type, JsonValue *value,
+                                            JsonIt *it);
+
+/*
+ Parses json values i.e. flts, ints, objects, arrays, bool, null, strings
+ */
+_WHY_JSON_FUNC_ int json_internal_parse_value(JsonType *type, JsonValue *value,
+                                              JsonIt *it);
+
+/*
+ Parses opening braces that is `{` and `[` and handles the stack response
+ */
+_WHY_JSON_FUNC_ int json_internal_parse_opening_braces(JsonIt *it);
+
+// == Definitions ==
 
 // Taken UTF8 validation from online since building it myself seemed annoying
 // Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
@@ -204,22 +391,42 @@ _WHY_JSON_FUNC_ int json_internal_read(JsonIt *it);
 // clang format doesn't like this
 // clang-format off
 static const uint8_t utf8d[] = {
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 00..1f
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 20..3f
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 40..5f
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 60..7f
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, // 80..9f
-  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, // a0..bf
-  8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, // c0..df
-  0xa,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x4,0x3,0x3, // e0..ef
-  0xb,0x6,0x6,0x6,0x5,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8, // f0..ff
-  0x0,0x1,0x2,0x3,0x5,0x8,0x7,0x1,0x1,0x1,0x4,0x6,0x1,0x1,0x1,0x1, // s0..s0
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,1, // s1..s2
-  1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1, // s3..s4
-  1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,3,1,1,1,1,1,1, // s5..s6
-  1,3,1,1,1,1,1,3,1,3,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // s7..s8
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 00..1f
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 20..3f
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 40..5f
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 60..7f
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, // 80..9f
+7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, // a0..bf
+8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, // c0..df
+0xa,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x4,0x3,0x3, // e0..ef
+0xb,0x6,0x6,0x6,0x5,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8, // f0..ff
+0x0,0x1,0x2,0x3,0x5,0x8,0x7,0x1,0x1,0x1,0x4,0x6,0x1,0x1,0x1,0x1, // s0..s0
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,1, // s1..s2
+1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1, // s3..s4
+1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,3,1,1,1,1,1,1, // s5..s6
+1,3,1,1,1,1,1,3,1,3,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // s7..s8
 };
 // clang-format on
+
+_WHY_JSON_FUNC_ char *json_get_str(JsonStr *str, size_t *len) {
+  if (len) {
+    *len = str->len;
+  }
+  if (!str->buf) {
+    return NULL;
+  }
+  if (str->allocated) {
+    str->allocated = 0;
+    char *tmp = (char *)str->buf;
+    str->buf = NULL;
+    str->len = 0;
+    return tmp;
+  } else {
+    char *tmp = malloc(sizeof(char) * (str->len + 1));
+    strncpy(tmp, str->buf, str->len + 1);
+    return tmp;
+  }
+}
 
 _WHY_JSON_FUNC_ int json_internal_error(JsonIt *it, int err, const char *fmt,
                                         ...) {
@@ -358,9 +565,6 @@ _WHY_JSON_FUNC_ int json_internal_init(JsonIt *it) {
   return 1;
 }
 
-/*
- Initialises a json iterator from a file
- */
 _WHY_JSON_FUNC_ int json_file(JsonIt *it, FILE *file) {
   if (file == NULL) {
     json_internal_error(it, JSON_ERR_INVALID_ARGS, "File should be valid");
@@ -372,9 +576,6 @@ _WHY_JSON_FUNC_ int json_file(JsonIt *it, FILE *file) {
   return res;
 }
 
-/*
- Initialises a json iterator from a string
- */
 _WHY_JSON_FUNC_ int json_str(JsonIt *it, const char *str) {
   if (str == NULL) {
     json_internal_error(it, JSON_ERR_INVALID_ARGS, "String should be valid");
@@ -399,7 +600,6 @@ _WHY_JSON_FUNC_ int json_internal_next_char(JsonIt *it) {
   return next;
 }
 
-// puts current char into buf
 _WHY_JSON_FUNC_ int json_internal_into_buf(char **tmp, size_t *tmp_len,
                                            size_t *tmp_cap, JsonIt *it, int c) {
   if (*tmp == NULL) {
@@ -753,6 +953,9 @@ _WHY_JSON_FUNC_ int json_internal_parse_identifier(JsonStr *out, JsonIt *it) {
   }
 
   // note we have to then backtrack one so that our cur_loc is on ':'
+  // @DEBT: @NOTE: We are taking some technical debt here
+  // But since strings can't have newlines in them this isn't too bad
+  // Just gotta be a bit more careful.
   it->cur_loc--;
   it->cur_col--;
   while (out->len > 0 && json_internal_is_whitespace(out->buf[out->len - 1])) {
@@ -794,7 +997,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_key(JsonTok *tok, JsonIt *it) {
   return 1;
 }
 
-// 1 if it matches, 0 if it doesn't, -1 if error
 _WHY_JSON_FUNC_ int json_internal_matches(const char *str, JsonIt *it) {
   while (*str != '\0') {
     if (it->cur_loc == it->buf_len && !json_internal_read(it)) {
@@ -805,8 +1007,19 @@ _WHY_JSON_FUNC_ int json_internal_matches(const char *str, JsonIt *it) {
       str++;
       json_internal_next_char(it);
     } else {
-      return 0;
+      break;
     }
+  }
+
+  // make sure the next character is not some kind of possible part of the
+  // string i.e. just check it is a comma or whitespace
+  int peek = json_internal_peek_char(it);
+  if (*str != '\0' ||
+      (peek != EOF && !json_internal_is_whitespace(peek) && peek != ',')) {
+    json_internal_error(
+        it, JSON_ERR_INVALID_VALUE,
+        "Iterator doesn't match %s, the invalid character is %c", str, peek);
+    return 0;
   }
 
   return 1;
@@ -994,11 +1207,6 @@ _WHY_JSON_FUNC_ int json_internal_parse_opening_braces(JsonIt *it) {
   return 1;
 }
 
-/*
- Goes to the next element in the json.  If the current element is at an object
- or array it will stop at the key allowing you to skip it else if you call
- next it'll step into it.
- */
 _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
   if (it->buf_len == 0 && it->cur_loc == 0 &&
       ((it->source_str_cur == 0 && it->source_str_len > 0 &&
@@ -1117,7 +1325,7 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
   }
 
   // then parse value
-  if (!json_internal_parse_value(&tok->type, &tok->value, it)) {
+  if (json_internal_parse_value(&tok->type, &tok->value, it) != 1) {
     json_destroy(tok, it);
     return 0;
   }
@@ -1125,12 +1333,6 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
   return 1;
 }
 
-/*
- Skips the json object useful for when you just want to visit the outer
- objects or don't want to visit an object for whatever reason.
-
- Errors if the current key is not an object or array.
- */
 _WHY_JSON_FUNC_ int json_skip(JsonTok *tok, JsonIt *it) {
   uint8_t wait;
   if (tok->type == JSON_ARRAY) {
@@ -1153,10 +1355,10 @@ _WHY_JSON_FUNC_ int json_skip(JsonTok *tok, JsonIt *it) {
 #undef WHY_JSON_GET_COUNT
 #undef WHY_JSON_CAN_ADD
 
-#if defined __cplusplus
-}
 #endif
 
+#if defined __cplusplus
+}
 #endif
 
 #endif

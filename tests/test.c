@@ -169,6 +169,46 @@ int main(int argc, char *argv[]) {
       expect_error(JSON_ERR_UNKNOWN_TOK);
     })
 
+    OBS_TEST("Invalid false too short", {
+      setup_str("fal");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Invalid false too long", {
+      setup_str("falsey");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Invalid true too short", {
+      setup_str("tru");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Invalid true too long", {
+      setup_str("trued");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Invalid null too short", {
+      setup_str("nul");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Invalid null too long", {
+      setup_str("nulley");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Value followed by comma, true", {
+      setup_str("true,");
+      expect_error(JSON_ERR_UNKNOWN_TOK);
+    })
+
+    OBS_TEST("String value followed by comma", {
+      setup_str("\"coolies\" ,");
+      expect_error(JSON_ERR_UNKNOWN_TOK);
+    })
+
     OBS_TEST("String with newlines", {
       setup_str("\"1, 2, 34\n\"");
       expect_error(JSON_ERR_MISSING_QUOTE);
