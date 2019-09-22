@@ -5,9 +5,20 @@
   obs_test_str_eq(a.buf, str);                                                 \
   obs_test_eq(size_t, a.len, strlen(str));
 
+#define test_next_json(err, wanted_res)                                        \
+  do {                                                                         \
+    errno = 0;                                                                 \
+    int res = json_next(&tok, &it);                                            \
+    if (res != wanted_res) {                                                   \
+      obs_err("Error json_next is not %s failed errno is %d",                  \
+              (wanted_res ? "true" : "false"), errno);                         \
+    }                                                                          \
+    obs_test_eq(int, errno, err);                                              \
+  } while (0)
+
 #define expect_next_obj_string(expect_key, str)                                \
   do {                                                                         \
-    obs_test_true(json_next(&tok, &it));                                       \
+    test_next_json(0, 1);                                                      \
     obs_test_eq(uint8_t, JSON_STRING, tok.type);                               \
     key_eql(tok.key, expect_key);                                              \
     key_eql(tok.value._str, str);                                              \
@@ -15,14 +26,14 @@
 
 #define expect_next_array_string(str)                                          \
   do {                                                                         \
-    obs_test_true(json_next(&tok, &it));                                       \
+    test_next_json(0, 1);                                                      \
     obs_test_eq(uint8_t, JSON_STRING, tok.type);                               \
     key_eql(tok.value._str, str);                                              \
   } while (0)
 
 #define expect_next_obj_value(expect_type, expect_key, val_type, expect_value) \
   do {                                                                         \
-    obs_test_true(json_next(&tok, &it));                                       \
+    test_next_json(0, 1);                                                      \
     obs_test_eq(uint8_t, (expect_type), tok.type);                             \
     if (tok.type != JSON_FLT && tok.type != JSON_INT &&                        \
         tok.type != JSON_BOOL) {                                               \
@@ -36,7 +47,7 @@
 
 #define expect_next_key_only(expect_type, expect_key)                          \
   do {                                                                         \
-    obs_test_true(json_next(&tok, &it));                                       \
+    test_next_json(0, 1);                                                      \
     obs_test_eq(uint8_t, expect_type, tok.type);                               \
     if (tok.type != JSON_ARRAY && tok.type != JSON_OBJECT &&                   \
         tok.type != JSON_NULL) {                                               \
@@ -48,7 +59,7 @@
 
 #define expect_next_array_value(expect_type, val_type, expect_value)           \
   do {                                                                         \
-    obs_test_true(json_next(&tok, &it));                                       \
+    test_next_json(0, 1);                                                      \
     obs_test_eq(uint8_t, (expect_type), tok.type);                             \
     if (tok.type != JSON_FLT && tok.type != JSON_INT &&                        \
         tok.type != JSON_BOOL) {                                               \
@@ -61,7 +72,7 @@
 
 #define expect_next_type(expect_type)                                          \
   do {                                                                         \
-    obs_test_true(json_next(&tok, &it));                                       \
+    test_next_json(0, 1);                                                      \
     obs_test_eq(uint8_t, expect_type, tok.type);                               \
     if (tok.type != JSON_END && tok.type != JSON_OBJECT_END &&                 \
         tok.type != JSON_ARRAY_END && tok.type != JSON_ARRAY &&                \
@@ -74,8 +85,7 @@
 
 #define expect_error(err)                                                      \
   do {                                                                         \
-    obs_test_false(json_next(&tok, &it));                                      \
-    obs_test_eq(int, errno, err);                                              \
+    test_next_json(err, 0);                                                    \
     obs_test_eq(uint8_t, tok.type, JSON_ERROR);                                \
   } while (0)
 

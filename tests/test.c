@@ -21,11 +21,13 @@ int main(int argc, char *argv[]) {
 
     OBS_TEST("String", {
       setup_str("{ \"a\": \"swifty\", \"b\": \"nice\", \"unicode_character\": "
-                "\"🐻\" }");
+                "\"🐻\", \"c\": 2, \"d\": \"hey\" }");
       expect_next_type(JSON_OBJECT);
       expect_next_obj_string("a", "swifty");
       expect_next_obj_string("b", "nice");
       expect_next_obj_string("unicode_character", "🐻");
+      expect_next_obj_value(JSON_INT, "c", long, 2);
+      expect_next_obj_string("d", "hey");
       expect_next_type(JSON_OBJECT_END);
       expect_next_type(JSON_END);
       obs_test_eq(int, errno, 0);
@@ -167,10 +169,104 @@ int main(int argc, char *argv[]) {
   OBS_TEST_GROUP("Errors", {
     ;
     OBS_TEST("No outer braces", {
-      setup_str("   \"a\": 94, \"b\": \"hey 🦍\", \"this is a long name\": "
+      setup_str("   \"a\": 94, \"b\": \"hey 🦍\", \"this is a "
+                "long name\": "
                 "2.223e9, \"d\": true, "
                 "\"e\": null ");
-      expect_error(JSON_ERR_UNKNOWN_TOK);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Empty array with comma", {
+      setup_str("[, ]");
+      expect_next_type(JSON_ARRAY);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Empty object with comma", {
+      setup_str("{,}");
+      expect_next_type(JSON_OBJECT);
+      expect_error(JSON_ERR_MISSING_QUOTE);
+    })
+
+    OBS_TEST("Array with comma at start", {
+      setup_str("[, 2, 3 ]");
+      expect_next_type(JSON_ARRAY);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Empty object with comma at start", {
+      setup_str("{, 2, 3 }");
+      expect_next_type(JSON_OBJECT);
+      expect_error(JSON_ERR_MISSING_QUOTE);
+    })
+
+    OBS_TEST("Multiple values", {
+      setup_str("1, 2, 3");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple values", {
+      setup_str("1, {}, []");
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple arrays", {
+      setup_str("[1, 2], [], []");
+      expect_next_type(JSON_ARRAY);
+      expect_next_array_value(JSON_INT, long, 1);
+      expect_next_array_value(JSON_INT, long, 2);
+      expect_next_type(JSON_ARRAY_END);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple array with values", {
+      setup_str("[1, 2], 2");
+      expect_next_type(JSON_ARRAY);
+      expect_next_array_value(JSON_INT, long, 1);
+      expect_next_array_value(JSON_INT, long, 2);
+      expect_next_type(JSON_ARRAY_END);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple arrays with objects", {
+      setup_str("[1, 2], {}, {}");
+      expect_next_type(JSON_ARRAY);
+      expect_next_array_value(JSON_INT, long, 1);
+      expect_next_array_value(JSON_INT, long, 2);
+      expect_next_type(JSON_ARRAY_END);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple objects", {
+      setup_str("{\"a\": 2}, {}");
+      expect_next_type(JSON_OBJECT);
+      expect_next_obj_value(JSON_INT, "a", long, 2);
+      expect_next_type(JSON_OBJECT_END);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple objects with values", {
+      setup_str("{\"a\": 2}, 2");
+      expect_next_type(JSON_OBJECT);
+      expect_next_obj_value(JSON_INT, "a", long, 2);
+      expect_next_type(JSON_OBJECT_END);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple objects with arrays", {
+      setup_str("{\"a\": 2}, []");
+      expect_next_type(JSON_OBJECT);
+      expect_next_obj_value(JSON_INT, "a", long, 2);
+      expect_next_type(JSON_OBJECT_END);
+      expect_error(JSON_ERR_INVALID_VALUE);
+    })
+
+    OBS_TEST("Multiple objects no commas", {
+      setup_str("{\"a\": 2} []");
+      expect_next_type(JSON_OBJECT);
+      expect_next_obj_value(JSON_INT, "a", long, 2);
+      expect_next_type(JSON_OBJECT_END);
+      expect_error(JSON_ERR_INVALID_VALUE);
     })
 
     OBS_TEST("Invalid false too short", {
@@ -205,15 +301,15 @@ int main(int argc, char *argv[]) {
 
     OBS_TEST("Value followed by comma, true", {
       setup_str("true,");
-      expect_error(JSON_ERR_UNKNOWN_TOK);
+      expect_error(JSON_ERR_INVALID_VALUE);
     })
 
     OBS_TEST("String value followed by comma", {
       setup_str("\"coolies\" ,");
-      expect_error(JSON_ERR_UNKNOWN_TOK);
+      expect_error(JSON_ERR_INVALID_VALUE);
     })
 
-    OBS_TEST("String with newlines", {
+    OBS_TEST("String with newlines ", {
       setup_str("\"1, 2, 34\n\"");
       expect_error(JSON_ERR_MISSING_QUOTE);
     })
