@@ -84,7 +84,7 @@ Typically you would even have custom parsing functions when you reach an object 
 
 ## Structures
 
-#### `JsonIt`
+### `JsonIt`
 
 Represents the iterator itself most of the fields shouldn't be touched (you also don't have to default initialise it since the json_file/json_str functions will).
 
@@ -95,7 +95,7 @@ You can touch the following however without any fear:
 - `int cur_col` the current column the iterator is at
 - `int depth` the depth of the current token (i.e. nesting depth)
 
-#### `JsonTok`
+### `JsonTok`
 
 Holds a specific token you probably want to just place this on the stack :) this holds the output for a given iteration.
 
@@ -107,7 +107,7 @@ Holds a specific token you probably want to just place this on the stack :) this
 - `char first` is this the first token in the given depth
   - i.e. for `{"a": 2, "c": 3, "d": [10, 100]}` `a: 2` and `10` will have the first flag flipped true
 
-#### `JsonStr`
+### `JsonStr`
 
 Holds a null terminated string.  We store it this way so you can take the string and edit it (turning the allocation flag off) or not edit it and have the iterator re-use it for later calls.  Currently only keys are re-used if they are after each other.
 
@@ -140,31 +140,31 @@ Is a union of `long _int, double _flt JsonStr _str, char _bool` you should check
 
 There are only 6 functions
 
-#### `int json_file(JsonIt *it, FILE *file);`
+### `int json_file(JsonIt *it, FILE *file);`
 
 This opens an iterator given a file, initialises `it` as well.
 
 ?> Performs reads into an intermediate buffer meaning it doesn't need the whole file at once, if you want the file to be streaming just don't send EOF till you finish writing or make it a blocking read till you get data.
 
-#### `int json_str(JsonIt *it, const char *str);`
+### `int json_str(JsonIt *it, const char *str);`
 
 Pretty much identical to the file one but uses a string to read from.
 
 ?> Very efficient string reading it doesn't use an intermediate buffer it just iterates directly over the string.
 
-#### `int json_next(JsonTok *tok, JsonIt *it);`
+### `int json_next(JsonTok *tok, JsonIt *it);`
 
 Gets the next token, will free all strings and cleanup memory from the last token.
 
 !> Tokens are always cleared upon this call.  Also if the result is JSON\_DONE OR JSON\_ERROR then json_destroy is called to cleanup the iterator for you
 
-#### `int json_skip(JsonTok *tok JsonIt *it);`
+### `int json_skip(JsonTok *tok JsonIt *it);`
 
 Skips the object/array in the case that you don't want to visit it's members.  Will error if the type of the token isn't object/array (i.e. if the previous one wasn't an object/array).
 
 Will also invalidate previous tok just like json_next.
 
-#### `int json_destroy(JsonTok *tok, JsonIt *it);`
+### `int json_destroy(JsonTok *tok, JsonIt *it);`
 
 Destroys the iterator and token data.  Either / both can be null (it won't do anything on NULL tokens/iterators) i.e. to just destroy token you can do `json_destroy(&tok, NULL);`.
 
@@ -172,7 +172,7 @@ Destroys the iterator and token data.  Either / both can be null (it won't do an
 
 !> DO NOT CALL json_next if the iterator has been destroyed it will just error out
 
-#### `char *json_get_str(JsonStr *str, size_t *len);`
+### `char *json_get_str(JsonStr *str, size_t *len);`
 
 Gives you a mutable string version (that also won't be freed upon the next call of json_next) of str.  Will avoid allocating if the string was already allocated (in some cases it can avoid allocation).
 
@@ -202,8 +202,6 @@ NOTE: all these differences can be disabled by doing `#define WHY_JSON_STRICT`
     }
   ]
 }
-
-?> Note that the `a: ` and `hp: ` syntax is already allowed you don't need to quote keys.  This syntax would have to be turned on for each individual JSON and would force all objects to have a type (except outer object)
-
 ```
 
+?> Note that the `a: ` and `hp: ` syntax is already allowed you don't need to quote keys.  This syntax would have to be turned on for each individual JSON and would force all objects to have a type (except outer object)
