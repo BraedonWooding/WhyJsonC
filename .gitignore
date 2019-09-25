@@ -53,3 +53,4 @@ dkms.conf
 
 # no log files from tests
 *.log
+*.DS_Store
