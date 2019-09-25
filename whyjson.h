@@ -142,7 +142,7 @@ struct json_str_t {
   /* TODO: Pack */
   const char *buf;
   size_t len;
-  int allocated;
+  char allocated;
 };
 
 /*
@@ -155,7 +155,7 @@ union json_value_t {
   long _int;
   double _flt;
   JsonStr _str;
-  int _bool;
+  char _bool;
 };
 
 /*
@@ -173,7 +173,7 @@ struct json_tok_t {
   JsonStr key;
   JsonType type;
   JsonValue value;
-  int first;
+  char first;
 };
 
 /*
@@ -504,7 +504,6 @@ _WHY_JSON_FUNC_ int json_internal_peek_char(JsonIt *it) {
   }
 
   if (it->stream != NULL) {
-    // use fread
     if (it->cur_loc == it->buf_len) {
       it->cur_loc = 0;
       it->buf_len = fread(it->buf, sizeof(char), WHY_JSON_BUF_SIZE, it->stream);
@@ -516,7 +515,6 @@ _WHY_JSON_FUNC_ int json_internal_peek_char(JsonIt *it) {
     }
     return it->buf[it->cur_loc];
   } else if (it->source_str != NULL) {
-    // use string buffer
     if (it->cur_loc >= it->buf_len) {
       return EOF;
     } else {
@@ -588,9 +586,11 @@ _WHY_JSON_FUNC_ int json_str(JsonIt *it, const char *str) {
   it->buf_len = strlen(str);
   it->state = json_internal_is_legal_utf8(&it->state, str, it->buf_len);
   if (it->state != WHY_JSON_UTF8_ACCEPT) {
-    // We need to handle the cases where we have only half a wide char
-    // at the end which would mean it->state != WHY_JSON_UTF8_REJECT
-    // since it's waiting for more.  This catches it
+    /*
+     We need to handle the cases where we have only half a wide char
+     at the end which would mean it->state != WHY_JSON_UTF8_REJECT
+     since it's waiting for more.  This catches it
+    */
     it->state = WHY_JSON_UTF8_REJECT;
     json_internal_error(it, JSON_ERR_NO_ERROR, "");
     return 0;
@@ -1198,10 +1198,22 @@ _WHY_JSON_FUNC_ int json_internal_parse_opening_braces(JsonIt *it) {
 }
 
 _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
-  // detecting if we are the first token
+  if (it->match_stack == NULL) {
+    /*
+       indication that we destroyed the iterator than are trying
+       to call next!! This is bad
+     */
+
+    json_internal_error(it, JSON_ERR_INVALID_ARGS,
+                        "Can't destroy iterator than call next");
+    return 0;
+  }
+
   if (!it->tok_init) {
-    // this is just an ease of use thing, so people don't have to worry
-    // about default initialising the token
+    /*
+     this is just an ease of use thing, so people don't have to worry
+     about default initialising the token
+    */
     memset(tok, 0, sizeof(JsonTok));
     tok->first = 1;
     it->tok_init = 1;
@@ -1313,6 +1325,17 @@ _WHY_JSON_FUNC_ int json_next(JsonTok *tok, JsonIt *it) {
 }
 
 _WHY_JSON_FUNC_ int json_skip(JsonTok *tok, JsonIt *it) {
+  if (it->match_stack == NULL) {
+    /*
+      indication that we destroyed the iterator than are trying
+      to call next!! This is bad
+    */
+
+    json_internal_error(it, JSON_ERR_INVALID_ARGS,
+                        "Can't destroy iterator than call next");
+    return 0;
+  }
+
   uint8_t wait;
   if (tok->type == JSON_ARRAY) {
     wait = JSON_ARRAY_END;

@@ -8,4 +8,5 @@
 
 > C89 Compliant
 
-Check out the docs [here](https://braedonwooding.github.io/WhyJsonC)
+Check out the docs [here](https://braedonwooding.github.io/WhyJson)
+
