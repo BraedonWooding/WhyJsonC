@@ -1005,7 +1005,7 @@ _WHY_JSON_FUNC_ int json_internal_parse_key(JsonTok *tok, JsonIt *it) {
     }
 #else
     errno = JSON_ERR_MISSING_QUOTE;
-    it->err = "Missing initial \"";
+    json_internal_error(it, JSON_ERR_MISSING_QUOTE, "Missing initial quote");
     return 0;
 #endif
   }
